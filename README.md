@@ -4,6 +4,21 @@ O **Gym Track** é um aplicativo web progressivo (PWA) projetado para rastreamen
 
 ---
 
+## 📸 Demonstração
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" width="240" alt="Dashboard e Streak" />
+  <img src="docs/screenshots/treinos.png" width="240" alt="Planejador de Treinos" />
+  <img src="docs/screenshots/execicios.png" width="240" alt="Enciclopédia de Exercícios" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/estatisticas.png" width="240" alt="Estatísticas e Histórico" />
+  <img src="docs/screenshots/exemplos.png" width="240" alt="Exemplos e Catálogo" />
+</p>
+
+---
+
 ## 🌟 Principais Funcionalidades
 
 ### 1. 📅 Painel Principal (Meu Plano)
