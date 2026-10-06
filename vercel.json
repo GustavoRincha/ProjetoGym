@@ -1,0 +1,19 @@
+{
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/((?!assets|fonts|sw\\.js|workbox-|manifest\\.webmanifest|registerSW\\.js|robots\\.txt|pwa-).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

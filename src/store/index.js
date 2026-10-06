@@ -1,0 +1,51 @@
+import { createStore } from 'vuex';
+import auth from './modules/auth';
+import workouts from './modules/workouts';
+import history from './modules/history';
+import goals from './modules/goals';
+import gamification from './modules/gamification';
+import body from './modules/body';
+import session from './modules/session';
+
+// Plugin para persistência de dados no localStorage (preparado para trocar para backend)
+const localStoragePlugin = store => {
+  // Load state from localStorage on init
+  const savedState = localStorage.getItem('gymtrack_state');
+  if (savedState) {
+    try {
+      store.replaceState(Object.assign({}, store.state, JSON.parse(savedState)));
+    } catch (e) {
+      console.error('Erro ao restaurar state do localStorage:', e);
+    }
+  }
+
+  // Subscribe to mutations to save state
+  store.subscribe((mutation, state) => {
+    // Ignora mutações de alta frequência do cronômetro para evitar gargalo de I/O contínuo
+    if (mutation.type === 'session/UPDATE_ELAPSED_TIME') {
+      return;
+    }
+
+    // We shouldn't save auth session here, let supabase handle it
+    const stateToSave = { ...state };
+    delete stateToSave.auth; 
+    try {
+      localStorage.setItem('gymtrack_state', JSON.stringify(stateToSave));
+    } catch (err) {
+      console.warn('Erro ao salvar estado no localStorage:', err);
+    }
+  });
+};
+
+export default createStore({
+  modules: {
+    auth,
+    workouts,
+    history,
+    goals,
+    gamification,
+    body,
+    session
+  },
+  plugins: [localStoragePlugin]
+});

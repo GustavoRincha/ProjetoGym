@@ -1,0 +1,51 @@
+import 'vuetify/styles'
+import { createVuetify } from 'vuetify'
+import { aliases, mdi } from 'vuetify/iconsets/mdi'
+// MDI font CSS is loaded from public/fonts/ via index.html for reliable offline caching
+
+const gymDark = {
+  dark: true,
+  colors: {
+    background: '#121212',
+    surface: '#1E1E1E',
+    primary: '#00E676', // Neon Green
+    secondary: '#FF6D00', // Vibrant Orange
+    accent: '#2979FF',
+    error: '#FF5252',
+    info: '#2196F3',
+    success: '#4CAF50',
+    warning: '#FB8C00',
+  },
+}
+
+const gymLight = {
+  dark: false,
+  colors: {
+    background: '#F4F6F9',
+    surface: '#FFFFFF',
+    primary: '#00E676', // Initial Green
+    secondary: '#FF6D00',
+    accent: '#2979FF',
+    error: '#FF5252',
+    info: '#2196F3',
+    success: '#4CAF50',
+    warning: '#FB8C00',
+  },
+}
+
+export default createVuetify({
+  theme: {
+    defaultTheme: 'gymDark',
+    themes: {
+      gymDark,
+      gymLight,
+    },
+  },
+  icons: {
+    defaultSet: 'mdi',
+    aliases,
+    sets: {
+      mdi,
+    },
+  },
+})

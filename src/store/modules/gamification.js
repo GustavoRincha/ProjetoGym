@@ -1,0 +1,138 @@
+import { supabase } from '@/plugins/supabase';
+import { syncService } from '@/services/syncService';
+
+// All available badges definition (exported for use in components)
+export const ALL_BADGES = [
+  { id: 'first_workout', name: 'Primeiro Treino', icon: '🏋️', description: 'Finalize seu primeiro treino', rarity: 'common' },
+  { id: 'week_streak', name: 'Em Chamas', icon: '🔥', description: 'Treine 7 dias seguidos', rarity: 'rare' },
+  { id: 'month_streak', name: 'Mês Perfeito', icon: '🌟', description: 'Treine 30 dias seguidos', rarity: 'epic' },
+  { id: 'early_bird', name: 'Madrugão', icon: '☀️', description: 'Finalize um treino antes das 7h da manhã', rarity: 'common' },
+  { id: 'night_owl', name: 'Coruja', icon: '🦉', description: 'Finalize um treino após as 22h', rarity: 'common' },
+  { id: '10_workouts', name: '10 Treinos', icon: '🔟', description: 'Finalize 10 treinos', rarity: 'common' },
+  { id: '50_workouts', name: '50 Treinos', icon: '🏅', description: 'Finalize 50 treinos', rarity: 'rare' },
+  { id: '100_workouts', name: '100 Treinos', icon: '💯', description: 'Finalize 100 treinos', rarity: 'epic' },
+  { id: '1_year', name: '1 Ano de Academia', icon: '🎂', description: 'Use o app por 365 dias', rarity: 'legendary' },
+  { id: 'volume_10k', name: '10 Toneladas', icon: '🪨', description: 'Levante 10.000kg em uma única sessão', rarity: 'rare' },
+];
+
+const LEVELS = [
+  { name: 'Iniciante',    minXp: 0,    icon: '🌱', nextXp: 500   },
+  { name: 'Intermediário', minXp: 500,  icon: '💪', nextXp: 1500  },
+  { name: 'Avançado',     minXp: 1500, icon: '🔥', nextXp: 3500  },
+  { name: 'Elite',        minXp: 3500, icon: '⚡', nextXp: 7500  },
+  { name: 'Lendário',     minXp: 7500, icon: '🏆', nextXp: null  },
+];
+
+export default {
+  namespaced: true,
+  state: {
+    xp: 0,
+    unlockedBadges: [], // [{ id, unlockedAt }]
+    firstUsedAt: new Date().toISOString(),
+  },
+  getters: {
+    xp: (s) => s.xp,
+    unlockedBadges: (s) => s.unlockedBadges,
+    level: (s) => {
+      let current = LEVELS[0];
+      for (const l of LEVELS) {
+        if (s.xp >= l.minXp) current = l;
+        else break;
+      }
+      return current;
+    },
+    levelProgress: (s, getters) => {
+      const current = getters.level;
+      if (!current.nextXp) return 100; // Max level
+      const prevXp = current.minXp;
+      const range = current.nextXp - prevXp;
+      const earned = s.xp - prevXp;
+      return Math.min(100, Math.round((earned / range) * 100));
+    },
+    xpToNextLevel: (s, getters) => {
+      const current = getters.level;
+      return current.nextXp ? current.nextXp - s.xp : 0;
+    },
+    allBadges: (state) => {
+      return ALL_BADGES.map(badge => ({
+        ...badge,
+        unlocked: state.unlockedBadges.some(u => u.id === badge.id),
+        unlockedAt: state.unlockedBadges.find(u => u.id === badge.id)?.unlockedAt || null,
+      }));
+    },
+  },
+  mutations: {
+    SET_GAMIFICATION(state, payload) {
+      if (payload.xp !== undefined) state.xp = payload.xp;
+      if (payload.unlocked_badges !== undefined) state.unlockedBadges = payload.unlocked_badges;
+    },
+    ADD_XP(state, amount) {
+      state.xp += amount;
+    },
+    UNLOCK_BADGE(state, badgeId) {
+      if (!state.unlockedBadges.some(b => b.id === badgeId)) {
+        state.unlockedBadges.push({ id: badgeId, unlockedAt: new Date().toISOString() });
+      }
+    },
+  },
+  actions: {
+    async fetchGamification({ commit, rootState }) {
+      const userId = rootState.auth?.user?.id;
+      if (!userId) return;
+
+      const { data } = await supabase.from('user_gamification').select('*').eq('user_id', userId).single();
+      if (data) {
+        commit('SET_GAMIFICATION', { xp: data.xp, unlocked_badges: data.unlocked_badges });
+      }
+    },
+
+    addXp({ commit, rootState, state }, amount) {
+      commit('ADD_XP', amount);
+      syncService.addToQueue('UPDATE_GAMIFICATION', { user_id: rootState.auth?.user?.id, xp: state.xp });
+      syncService.processQueue();
+    },
+    
+    unlockBadge({ commit, rootState, state }, badgeId) {
+      commit('UNLOCK_BADGE', badgeId);
+      syncService.addToQueue('UPDATE_GAMIFICATION', { user_id: rootState.auth?.user?.id, unlocked_badges: state.unlockedBadges });
+      syncService.processQueue();
+    },
+
+    checkAndUnlockBadges({ state, rootState, dispatch }, { sessionData, streak }) {
+      const sessions = rootState.history?.sessions || [];
+      const hour = new Date(sessionData.date).getHours();
+
+      // Calculate session volume (kg)
+      const totalVolume = (sessionData.exercises || []).reduce((total, ex) => {
+        return total + (ex.performed || []).reduce((sum, set) => {
+          return sum + (set.completed ? (set.weight || 0) * (set.reps || 0) : 0);
+        }, 0);
+      }, 0);
+
+      const userCreationDate = rootState.auth?.user?.created_at || (sessions[0]?.date) || null;
+      const daysSinceFirst = userCreationDate
+        ? (new Date() - new Date(userCreationDate)) / (1000 * 60 * 60 * 24)
+        : 0;
+
+      const conditions = {
+        first_workout:  sessions.length >= 1,
+        week_streak:    streak >= 7,
+        month_streak:   streak >= 30,
+        early_bird:     hour < 7,
+        night_owl:      hour >= 22,
+        '10_workouts':  sessions.length >= 10,
+        '50_workouts':  sessions.length >= 50,
+        '100_workouts': sessions.length >= 100,
+        '1_year':       daysSinceFirst >= 365,
+        volume_10k:     totalVolume >= 10000,
+      };
+
+      for (const [badgeId, isEarned] of Object.entries(conditions)) {
+        if (isEarned && !state.unlockedBadges.some(b => b.id === badgeId)) {
+          dispatch('unlockBadge', badgeId);
+          dispatch('addXp', 150); // Badge XP bonus
+        }
+      }
+    },
+  },
+};
